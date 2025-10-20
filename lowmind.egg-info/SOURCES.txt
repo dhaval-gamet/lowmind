@@ -1,8 +1,0 @@
-LICENSE
-README.md
-setup.py
-lowmind.egg-info/PKG-INFO
-lowmind.egg-info/SOURCES.txt
-lowmind.egg-info/dependency_links.txt
-lowmind.egg-info/requires.txt
-lowmind.egg-info/top_level.txt
