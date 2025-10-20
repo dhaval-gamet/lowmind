@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="lowmind",
-    version="0.3.0",
+    version="0.4.0",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
 
@@ -12,7 +12,7 @@ setup(
     ],
     author="VEDRA",
     description="Ultra-lightweight Deep Learning Framework for Raspberry Pi",
-    long_description=open("README .md").read(),
+    long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     url="https://github.com/dhaval-gamet/lowmind",
     classifiers=[
