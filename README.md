@@ -2,8 +2,6 @@
 
 <div align="center">
 
-![logo.png](https://via.placeholder.com/150x150/4A90E2/FFFFFF?text=LM)
-
 **Deep Learning on Raspberry Pi and Low-End Devices Made Possible**
 
 [![Python Version](https://img.shields.io/badge/python-3.6%2B-blue)](https://www.python.org/)
