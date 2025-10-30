@@ -1,11 +1,9 @@
-from setuptools import setup, find_packages
+from setuptools import setup
 
 setup(
     name="lowmind",
     version="0.6.0",
-    packages=find_packages(where="src"),
-    package_dir={"": "src"},
-
+    py_modules=["lowmind"],  # <-- single module file lowmind.py
     install_requires=[
         "numpy>=1.19.0",
         "psutil>=5.8.0"
