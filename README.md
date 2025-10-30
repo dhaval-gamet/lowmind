@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![LowMind Logo](https://via.placeholder.com/150x150/4A90E2/FFFFFF?text=LM)
+![logo.png](https://via.placeholder.com/150x150/4A90E2/FFFFFF?text=LM)
 
 **Deep Learning on Raspberry Pi and Low-End Devices Made Possible**
 
