@@ -1,4 +1,4 @@
-# This is a main lowmind deep larning framework file
+# This is a main lowmind deep learning framework file
 import numpy as np
 import time
 from collections import OrderedDict, defaultdict
@@ -27,23 +27,26 @@ class MemoryManager:
         if hasattr(tensor, 'grad') and tensor.grad is not None:
             size += tensor.grad.nbytes
         
-        # Aggressive memory management for Raspberry Pi
-        if self.allocated_memory + size > self.max_memory:
+        # FIXED: Better memory management with retry logic
+        max_retries = 3
+        for retry in range(max_retries):
+            if self.allocated_memory + size <= self.max_memory:
+                break
+                
             self.free_unused()
-            gc.collect()  # Force garbage collection
+            gc.collect()
             
-            if self.allocated_memory + size > self.max_memory:
+            if retry == 1:
                 self.free_all_non_essential()
                 gc.collect()
                 
-            if self.allocated_memory + size > self.max_memory:
-                # Last resort: clear cache and try again
+            if retry == 2:
                 self.clear_cache()
                 gc.collect()
-                
-            if self.allocated_memory + size > self.max_memory:
-                raise MemoryError(f"Raspberry Pi memory limit exceeded: {self.allocated_memory/(1024*1024):.2f}MB used, "
-                                 f"{size/(1024*1024):.2f}MB requested, {self.max_memory/(1024*1024):.2f}MB max")
+        else:
+            raise MemoryError(f"Raspberry Pi memory limit exceeded after {max_retries} retries: "
+                             f"{self.allocated_memory/(1024*1024):.2f}MB used, "
+                             f"{size/(1024*1024):.2f}MB requested, {self.max_memory/(1024*1024):.2f}MB max")
         
         self.allocated_memory += size
         self.peak_memory = max(self.peak_memory, self.allocated_memory)
@@ -126,7 +129,7 @@ memory_manager = MemoryManager(max_memory_mb=64)  # Very conservative
 # ----------------------------
 class Tensor:
     def __init__(self, data, requires_grad=False, _children=(), _op='', device='cpu', name=None, 
-                 persistent=False):
+                 persistent=False, debug=False):
         # Memory optimization: use float32 and avoid unnecessary copies
         if isinstance(data, np.ndarray):
             self.data = data.astype(np.float32, copy=False)
@@ -143,6 +146,7 @@ class Tensor:
         self.name = name
         self._version = 0
         self.persistent = persistent  # Whether to keep in memory during cleanup
+        self.debug = debug
         
         # Lazy gradient allocation - FIXED: Only initialize if requires_grad is True
         if self.requires_grad:
@@ -163,6 +167,11 @@ class Tensor:
         if hasattr(self, 'name') and self.name and not self.persistent:
             memory_manager.free(self.name)
     
+    def _ensure_grad(self):
+        """Ensure gradient is initialized if required"""
+        if self.requires_grad and self.grad is None:
+            self.grad = np.zeros_like(self.data, dtype=np.float32)
+    
     # Optimized operations with memory considerations
     def __add__(self, other):
         other = other if isinstance(other, Tensor) else Tensor(other, device=self.device)
@@ -171,14 +180,17 @@ class Tensor:
                     _children=(self, other), _op='+', device=self.device)
         
         def _backward():
-            if self.requires_grad and self.grad is not None:
+            # FIXED: Ensure gradients are initialized before operations
+            if self.requires_grad:
+                self._ensure_grad()
                 grad = out.grad
                 # Memory-efficient broadcasting
                 if self.data.shape != grad.shape:
                     grad = self._broadcast_grad(grad, self.data.shape)
                 self.grad += grad
                 
-            if other.requires_grad and other.grad is not None:
+            if other.requires_grad:
+                other._ensure_grad()
                 grad = out.grad
                 if other.data.shape != grad.shape:
                     grad = self._broadcast_grad(grad, other.data.shape)
@@ -194,13 +206,15 @@ class Tensor:
                     _children=(self, other), _op='*', device=self.device)
         
         def _backward():
-            if self.requires_grad and self.grad is not None:
+            if self.requires_grad:
+                self._ensure_grad()
                 grad = out.grad * other.data
                 if self.data.shape != grad.shape:
                     grad = self._broadcast_grad(grad, self.data.shape)
                 self.grad += grad
                 
-            if other.requires_grad and other.grad is not None:
+            if other.requires_grad:
+                other._ensure_grad()
                 grad = out.grad * self.data
                 if other.data.shape != grad.shape:
                     grad = self._broadcast_grad(grad, other.data.shape)
@@ -228,7 +242,8 @@ class Tensor:
                     _children=(self,), _op=f'**{power}', device=self.device)
         
         def _backward():
-            if self.requires_grad and self.grad is not None:
+            if self.requires_grad:
+                self._ensure_grad()
                 self.grad += (power * (self.data ** (power - 1))) * out.grad
                 
         out._backward = _backward
@@ -240,7 +255,8 @@ class Tensor:
                     _children=(self,), _op='sum', device=self.device)
         
         def _backward():
-            if self.requires_grad and self.grad is not None:
+            if self.requires_grad:
+                self._ensure_grad()
                 grad = out.grad
                 if axis is not None:
                     # Expand dimensions to match original shape
@@ -258,7 +274,8 @@ class Tensor:
                     _children=(self,), _op='mean', device=self.device)
         
         def _backward():
-            if self.requires_grad and self.grad is not None:
+            if self.requires_grad:
+                self._ensure_grad()
                 grad = out.grad
                 if axis is not None:
                     count = np.prod([self.data.shape[i] for i in (axis if isinstance(axis, tuple) else (axis,))])
@@ -278,7 +295,8 @@ class Tensor:
                     _children=(self,), _op='transpose', device=self.device)
         
         def _backward():
-            if self.requires_grad and self.grad is not None:
+            if self.requires_grad:
+                self._ensure_grad()
                 if axes is None:
                     self.grad += out.grad.T
                 else:
@@ -297,7 +315,8 @@ class Tensor:
                     _children=(self,), _op='reshape', device=self.device)
         
         def _backward():
-            if self.requires_grad and self.grad is not None:
+            if self.requires_grad:
+                self._ensure_grad()
                 self.grad += np.reshape(out.grad, self.data.shape)
                 
         out._backward = _backward
@@ -309,7 +328,8 @@ class Tensor:
                     _children=(self,), _op='relu', device=self.device)
         
         def _backward():
-            if self.requires_grad and self.grad is not None:
+            if self.requires_grad:
+                self._ensure_grad()
                 self.grad += (self.data > 0) * out.grad
                 
         out._backward = _backward
@@ -322,7 +342,8 @@ class Tensor:
                     _children=(self,), _op='sigmoid', device=self.device)
         
         def _backward():
-            if self.requires_grad and self.grad is not None:
+            if self.requires_grad:
+                self._ensure_grad()
                 self.grad += sigmoid_data * (1 - sigmoid_data) * out.grad
                 
         out._backward = _backward
@@ -335,7 +356,8 @@ class Tensor:
                     _children=(self,), _op='tanh', device=self.device)
         
         def _backward():
-            if self.requires_grad and self.grad is not None:
+            if self.requires_grad:
+                self._ensure_grad()
                 self.grad += (1 - tanh_data ** 2) * out.grad
                 
         out._backward = _backward
@@ -348,7 +370,8 @@ class Tensor:
                     _children=(self,), _op='exp', device=self.device)
         
         def _backward():
-            if self.requires_grad and self.grad is not None:
+            if self.requires_grad:
+                self._ensure_grad()
                 self.grad += exp_data * out.grad
                 
         out._backward = _backward
@@ -360,7 +383,8 @@ class Tensor:
                     _children=(self,), _op='log', device=self.device)
         
         def _backward():
-            if self.requires_grad and self.grad is not None:
+            if self.requires_grad:
+                self._ensure_grad()
                 self.grad += (1 / (self.data + 1e-8)) * out.grad
                 
         out._backward = _backward
@@ -373,9 +397,11 @@ class Tensor:
                     _children=(self, other), _op='@', device=self.device)
         
         def _backward():
-            if self.requires_grad and self.grad is not None:
+            if self.requires_grad:
+                self._ensure_grad()
                 self.grad += out.grad @ other.data.T
-            if other.requires_grad and other.grad is not None:
+            if other.requires_grad:
+                other._ensure_grad()
                 other.grad += self.data.T @ out.grad
                 
         out._backward = _backward
@@ -439,9 +465,11 @@ class Tensor:
         
         # Simplified backward for chunked version
         def _backward():
-            if self.requires_grad and self.grad is not None:
+            if self.requires_grad:
+                self._ensure_grad()
                 self.grad += out.grad @ other.data.T
-            if other.requires_grad and other.grad is not None:
+            if other.requires_grad:
+                other._ensure_grad()
                 other.grad += self.data.T @ out.grad
         
         out._backward = _backward
@@ -449,6 +477,13 @@ class Tensor:
 
     def backward(self, grad=None):
         """Memory-optimized backward pass"""
+        # FIXED: Check if gradients are required
+        if not self.requires_grad:
+            raise RuntimeError("backward called on tensor that doesn't require gradients")
+            
+        if self.debug:
+            print(f"Backward on tensor {self.name}, grad: {grad}")
+            
         # Free unused memory before backward pass
         memory_manager.free_unused()
         
@@ -465,24 +500,26 @@ class Tensor:
         
         build_topo(self)
         
-        # Initialize gradient - FIXED: Handle grad initialization properly
-        if self.grad is None:
-            if grad is None:
-                if self.data.shape == ():
-                    self.grad = np.array(1.0, dtype=np.float32)
-                else:
-                    self.grad = np.ones_like(self.data, dtype=np.float32)
-            else:
+        # FIXED: Proper gradient initialization
+        if grad is not None:
+            if self.grad is None:
                 self.grad = grad if isinstance(grad, np.ndarray) else np.array(grad, dtype=np.float32)
-        elif grad is not None:
-            self.grad = self.grad + (grad if isinstance(grad, np.ndarray) else np.array(grad, dtype=np.float32))
+            else:
+                self.grad += grad
+        elif self.grad is None:
+            # Initialize gradient to ones for the output tensor
+            self.grad = np.ones_like(self.data, dtype=np.float32)
         
-        # Go backwards through the graph with memory cleanup
+        # Go backwards through the graph
         for i, node in enumerate(reversed(topo)):
+            # FIXED: Ensure grad is initialized before backward for all nodes
+            if node.requires_grad and node.grad is None:
+                node.grad = np.zeros_like(node.data, dtype=np.float32)
+            
             node._backward()
             
             # Clean intermediate nodes to save memory
-            if i % 5 == 0:  # Clean every 5 nodes
+            if i % 5 == 0:
                 memory_manager.free_unused()
 
     def __repr__(self):
@@ -668,13 +705,14 @@ def cross_entropy_loss(output, target):
     
     def _backward():
         if output.requires_grad:
+            # FIXED: Ensure gradient is initialized
+            if output.grad is None:
+                output.grad = np.zeros_like(output.data, dtype=np.float32)
+                
             grad = softmax_vals.copy()
             grad[np.arange(batch_size), target_indices] -= 1
             grad /= batch_size
-            if output.grad is None:
-                output.grad = grad
-            else:
-                output.grad += grad
+            output.grad += grad
     
     loss._backward = _backward
     return loss
@@ -700,6 +738,9 @@ class SGD:
         for param in self.params:
             if param.grad is not None:
                 param.grad.fill(0)
+            # FIXED: Also set to None to free memory
+            elif param.requires_grad:
+                param.grad = None
     
     def step(self):
         for i, param in enumerate(self.params):
