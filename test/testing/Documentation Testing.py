@@ -1,3 +1,9 @@
+
+
+import lowmind as lm
+import numpy as np
+
+
 def test_examples_in_readme():
     """Test that all examples in README work correctly"""
     print("🧪 Testing README Examples")
