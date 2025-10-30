@@ -1,3 +1,7 @@
+import lowmind as lm
+import numpy as np
+
+
 class TrainingVisualizer:
     def __init__(self):
         self.loss_history = []
