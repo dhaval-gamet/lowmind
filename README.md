@@ -230,9 +230,9 @@ For issues, questions, or contributions:
 
 *Empowering education and innovation in resource-constrained environments*
 
-![India Flag](https://via.placeholder.com/20x13/FF9933/FFFFFF?text=+)
-![India Flag](https://via.placeholder.com/20x13/FFFFFF/000000?text=+)
-![India Flag](https://via.placeholder.com/20x13/138808/FFFFFF?text=+)
+!🇮🇳(https://via.placeholder.com/20x13/FF9933/FFFFFF?text=+)
+!🇮🇳(https://via.placeholder.com/20x13/FFFFFF/000000?text=+)
+!🇮🇳(https://via.placeholder.com/20x13/138808/FFFFFF?text=+)
 
 </div>
 
