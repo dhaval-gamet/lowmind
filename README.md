@@ -58,11 +58,8 @@ sudo apt install python3-pip python3-numpy python3-psutil
 ### Installation Steps
 ```bash
 # Clone the repository
-git clone https://github.com/dhavalgameti/lowmind.git
-cd lowmind
-
-# No installation required! Just import and use
-python3 your_script.py
+git clone https://github.com/dhavalgamet/lowmind.git
+cd lowmind 
 ```
 
 ## 📖 Quick Example
