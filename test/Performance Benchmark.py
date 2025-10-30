@@ -1,3 +1,7 @@
+import lowmind as lm
+import numpy as np
+
+
 def performance_benchmark_visible():
     print("⚡ Performance Benchmark")
     print("=" * 40)
