@@ -1,3 +1,7 @@
+import lowmind as lm
+import numpy as np
+
+
 def smart_home_demo_visible():
     print("🏠 Smart Home AI Demo")
     print("=" * 40)
