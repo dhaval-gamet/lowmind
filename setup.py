@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="lowmind",
-    version="0.6.0",
+    version="1.7.0",
     py_modules=["lowmind"],  # <-- single module file lowmind.py
     install_requires=[
         "numpy>=1.19.0",
